@@ -3,7 +3,11 @@ const { admin, db } = require('../util/admin');
 const config = require('../util/config');
 const firebase = require('firebase');
 firebase.initializeApp(config);
-const { validateSignupData, validationLogin } = require('../util/validators');
+const {
+  validateSignupData,
+  validationLogin,
+  reducedToObject,
+} = require('../util/validators');
 
 exports.signUp = (req, res) => {
   const newUser = {
@@ -76,7 +80,7 @@ exports.login = (req, res) => {
       )
         return res
           .status(403)
-          .json({ general: 'wrong credentials please try again later' });
+          .json({ general: 'Something went wrong, please try again' });
       res.status(500).json({ error: err.code });
     });
 };
@@ -158,8 +162,95 @@ exports.addUserDetails = (req, res) => {
   if (userDetails.website && !userDetails.website.startsWith('http'))
     userDetails.website = `http://${userDetails.website}`;
   db.doc(`/users/${req.user.handle}`)
-    .update({ userDetails })
+    .update(userDetails)
     .then(() => res.json({ message: 'user details added successfully' }))
+    .catch((err) => {
+      console.error(err);
+      return res.status(500).json({ error: err.code });
+    });
+};
+// Get own user details
+exports.getAuthenticatedUser = (req, res) => {
+  let userData = {};
+  db.doc(`/users/${req.user.handle}`)
+    .get()
+    .then((doc) => {
+      if (doc.exists) {
+        userData.credentials = doc.data();
+      }
+      return db
+        .collection('likes')
+        .where('handle', '==', req.user.handle)
+        .get();
+    })
+    .then((snapshot) => {
+      userData.likes = [];
+      snapshot.forEach((doc) => userData.likes.push(doc.data()));
+      return db
+        .collection('notifications')
+        .where('recipient', '==', req.user.handle)
+        .orderBy('createdAt', 'desc')
+        .limit(10)
+        .get();
+    })
+    .then((snapshot) => {
+      userData.notifications = [];
+      snapshot.forEach((doc) => {
+        let notificationData = doc.data();
+        notificationData.notificationId = doc.id;
+        userData.likes.push(notificationData);
+      });
+      return res.json(userData);
+    })
+    .catch((err) => {
+      console.log(err);
+      return res.status(500).json({ error: err.code });
+    });
+};
+// Get any user's details
+exports.getUserDetails = (req, res) => {
+  let userData = {};
+  db.collection('users')
+    .doc(req.params.handle)
+    .get()
+    .then((doc) => {
+      if (!doc.exists) {
+        return res.status(404).json({ error: 'user Not Found' });
+      }
+      userData.user = doc.data();
+      return db
+        .collection('screams')
+        .where('userHandled', '==', doc.data().handle)
+        .orderBy('createdAt', 'desc')
+        .get();
+    })
+    .then((snapshot) => {
+      userData.screams = [];
+      snapshot.forEach((doc) => {
+        let screamDoc = doc.data();
+        screamDoc.screamId = doc.id;
+        userData.screams.push(screamDoc);
+      });
+      return res.json(userData);
+    })
+    .catch((err) => {
+      console.error(err);
+      res.status(500).json({ error: err.code });
+    });
+};
+
+exports.markNotificationsRead = (req, res) => {
+  const batch = db.batch();
+  req.body.forEach((notificationId) => {
+    batch.update(db.collection('notifications').doc(notificationId), {
+      read: true,
+    });
+  });
+  batch
+    .commit()
+    .then(() => {
+      return res.json({ message: 'Notifications marked read' });
+    })
     .catch((err) => {
       console.error(err);
       return res.status(500).json({ error: err.code });

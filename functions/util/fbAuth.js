@@ -23,8 +23,9 @@ module.exports = (req, res, next) => {
         .limit(1)
         .get();
     })
-    .then((data) => {
-      req.user.handle = data.docs[0].data().handle;
+    .then((doc) => {
+      req.user.handle = doc.docs[0].data().handle;
+      req.user.imageUrl = doc.docs[0].data().imageUrl;
       return next();
     })
     .catch((err) => res.status(403).json({ error: 'unAuthoraized' }));
