@@ -80,7 +80,7 @@ exports.login = (req, res) => {
       )
         return res
           .status(403)
-          .json({ general: 'Something went wrong, please try again' });
+          .json({ general: 'invalid credentials.wrong userid/ password' });
       res.status(500).json({ error: err.code });
     });
 };
@@ -143,6 +143,20 @@ exports.uploadImage = (req, res) => {
       .upload(imageTobeUploaded.filepath, options)
       .then(() => {
         imageUrl = `https://firebasestorage.googleapis.com/v0/b/${config.storageBucket}/o/${imageFileName}?alt=media&token=${generatedToken}`;
+        let oldImageurl = req.user.imageUrl;
+        let semiUrl = oldImageurl.split('/')[oldImageurl.split('/').length - 1];
+        let filename = semiUrl.substring(0, semiUrl.indexOf('?'));
+        if (filename !== 'noimg.png') {
+          admin
+            .storage()
+            .bucket(config.storageBucket)
+            .file(filename)
+            .delete()
+            .then(() => {
+              console.log('old image deleted sucessfully');
+            })
+            .catch((err) => console.error(err));
+        }
         return db.doc(`/users/${req.user.handle}`).update({ imageUrl });
       })
       .then(() => {

@@ -1,7 +1,7 @@
 const { db } = require('../util/admin');
 exports.getAllScreams = (req, res) => {
   db.collection('screams')
-    .orderBy('createdAT', 'desc')
+    .orderBy('createdAt', 'desc')
     .get()
     .then((snapshot) => {
       let screams = [];
