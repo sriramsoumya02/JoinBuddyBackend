@@ -138,7 +138,7 @@ exports.onUserImagechange = functions
 
       return db
         .collection('screams')
-        .where('userHandled', '==', change.before.data().userHandle)
+        .where('userHandled', '==', change.before.data().handle)
         .get()
         .then((snapshot) => {
           snapshot.forEach((doc) => {
